@@ -1,0 +1,43 @@
+initialize:
+  - run: |
+      # Node 20 into ~/.local/node (no sudo available)
+      if [ ! -x ~/.local/node/bin/node ]; then
+        mkdir -p ~/.local/node
+        curl -fsSL https://nodejs.org/dist/v20.18.1/node-v20.18.1-linux-x64.tar.xz | tar -xJ --strip-components=1 -C ~/.local/node
+      fi
+      echo "PATH=$HOME/.local/node/bin:$HOME/.local/ollama/bin:$PATH" >> $ENVRC
+      export PATH=$HOME/.local/node/bin:$HOME/.local/ollama/bin:$PATH
+  - run: |
+      # Ollama local install + small model
+      if [ ! -x ~/.local/ollama/bin/ollama ]; then
+        mkdir -p ~/.local/ollama
+        curl -fsSL https://github.com/ollama/ollama/releases/latest/download/ollama-linux-amd64.tar.zst -o /tmp/ollama.tar.zst
+        tar --use-compress-program=unzstd -xf /tmp/ollama.tar.zst -C ~/.local/ollama
+      fi
+      (nohup ~/.local/ollama/bin/ollama serve >/tmp/ollama.log 2>&1 &)
+      sleep 5
+      ~/.local/ollama/bin/ollama pull qwen2.5:0.5b
+maintenance:
+  - run: |
+      (cd backend && python3 -m venv .venv && .venv/bin/pip install -q -r requirements.txt)
+      (cd frontend && ~/.local/node/bin/npm install --no-audit --no-fund)
+knowledge:
+  - name: test
+    contents: |
+      cd backend && .venv/bin/python -m pytest tests/ -q   # 15 tests
+  - name: run-backend
+    contents: |
+      cd backend && .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+  - name: build-frontend
+    contents: |
+      cd frontend && npm run build   # tsc --noCheck && vite build → dist/ served by backend
+  - name: build-apk
+    contents: |
+      cd frontend && npm run build && npx cap sync android
+      cd android && ANDROID_HOME=~/Android/Sdk JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew assembleDebug --no-daemon
+      # → android/app/build/outputs/apk/debug/app-debug.apk
+  - name: notes
+    contents: |
+      Backend serves frontend/dist at :8000; SQLite at data/app.db; Ollama at :11434.
+      Maven Central 429s on this IP — android/build.gradle already includes the
+      googleapis maven mirror; do not remove it.
