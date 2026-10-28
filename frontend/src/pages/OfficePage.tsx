@@ -1,4 +1,5 @@
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Component, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Text, Html } from '@react-three/drei'
 import { api, connectBus } from '../api'
@@ -173,6 +174,23 @@ function DayNight({ on, hour, light }: { on: boolean; hour: number; light: any }
   )
 }
 
+/* Catches WebGL/renderer failures so a broken 3D context can't unmount the
+   whole app (spec: the office is an optional visual layer). */
+class CanvasBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  componentDidCatch(err: unknown) { console.error('office 3D error', err) }
+  render() {
+    if (this.state.failed) return (
+      <div className="h-full flex items-center justify-center text-slate-400 text-sm p-8 text-center">
+        La oficina 3D no está disponible en este navegador o GPU (WebGL).<br />
+        Los agentes siguen funcionando: puedes gestionarlos desde Agentes y Tareas.
+      </div>
+    )
+    return this.props.children
+  }
+}
+
 export default function OfficePage() {
   const [data, setData] = useState<OfficeData | null>(null)
   const [admin, setAdmin] = useState(false)
@@ -217,6 +235,7 @@ export default function OfficePage() {
         </label>
       </div>
       <div className="flex-1 relative">
+        <CanvasBoundary>
         <Canvas camera={{ position: [9, 8, 10], fov: 45 }}>
           <DayNight on={cycleOn} hour={hour} light={cfg.lighting} />
           <Suspense fallback={null}>
@@ -234,6 +253,7 @@ export default function OfficePage() {
           <OrbitControls maxPolarAngle={Math.PI / 2.15} minDistance={3} maxDistance={22}
             enablePan enableRotate enableZoom />
         </Canvas>
+        </CanvasBoundary>
         {admin && (
           <div className="absolute right-3 top-3 card w-72 space-y-2 max-h-[80%] overflow-y-auto scroll-thin">
             <h3 className="font-semibold">Administrador de oficina</h3>

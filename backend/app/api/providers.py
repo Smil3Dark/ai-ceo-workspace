@@ -28,32 +28,8 @@ def create(payload: ProviderIn, db: Session = Depends(get_db)):
     return serialize(p)
 
 
-@router.put("/{pid}")
-def update(pid: int, payload: dict, db: Session = Depends(get_db)):
-    p = provider_service.update(db, pid, **payload)
-    if not p:
-        raise HTTPException(404)
-    return serialize(p)
-
-
-@router.delete("/{pid}")
-def delete(pid: int, db: Session = Depends(get_db)):
-    if not provider_service.delete(db, pid):
-        raise HTTPException(404)
-    return {"ok": True}
-
-
-@router.post("/{pid}/test")
-async def test(pid: int, db: Session = Depends(get_db)):
-    ok, detail = await provider_service.test_provider(db, pid)
-    return {"ok": ok, "detail": detail}
-
-
-@router.get("/{pid}/models")
-async def models(pid: int, db: Session = Depends(get_db)):
-    return {"models": await provider_service.list_models(db, pid)}
-
-
+# Static paths MUST be registered before /{pid} or FastAPI tries to parse
+# "mode"/"catalog" as an int and returns 422.
 @router.get("/mode")
 def get_mode(db: Session = Depends(get_db)):
     return {"ai_mode": settings_service.get(db, "ai_mode", "local")}
@@ -89,3 +65,29 @@ def catalog():
                  "OpenRouter, LM Studio… Requiere URL y normalmente una API key.",
          "default_url": "https://api.openai.com", "free": False},
     ]}
+
+
+@router.put("/{pid}")
+def update(pid: int, payload: dict, db: Session = Depends(get_db)):
+    p = provider_service.update(db, pid, **payload)
+    if not p:
+        raise HTTPException(404)
+    return serialize(p)
+
+
+@router.delete("/{pid}")
+def delete(pid: int, db: Session = Depends(get_db)):
+    if not provider_service.delete(db, pid):
+        raise HTTPException(404)
+    return {"ok": True}
+
+
+@router.post("/{pid}/test")
+async def test(pid: int, db: Session = Depends(get_db)):
+    ok, detail = await provider_service.test_provider(db, pid)
+    return {"ok": ok, "detail": detail}
+
+
+@router.get("/{pid}/models")
+async def models(pid: int, db: Session = Depends(get_db)):
+    return {"models": await provider_service.list_models(db, pid)}

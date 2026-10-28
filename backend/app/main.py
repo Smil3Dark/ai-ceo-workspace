@@ -11,6 +11,7 @@ from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .api import agents, chat, memory, misc, onboarding, permissions, \
     projects, providers, tasks
@@ -76,7 +77,19 @@ def health():
     return {"ok": True}
 
 
-# Serve the built frontend when present (frontend/dist)
+# Serve the built frontend when present (frontend/dist). The SPA fallback
+# returns index.html for unknown paths so client-side routes survive refresh.
+class SPAStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope):
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            if exc.status_code == 404 and not scope["path"].startswith(
+                    ("/api/", "/ws")):
+                return await super().get_response("index.html", scope)
+            raise
+
+
 _dist = BASE_DIR / "frontend" / "dist"
 if _dist.exists():
-    app.mount("/", StaticFiles(directory=_dist, html=True), name="frontend")
+    app.mount("/", SPAStaticFiles(directory=_dist, html=True), name="frontend")
