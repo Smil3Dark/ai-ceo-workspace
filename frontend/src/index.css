@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; }
+body { margin: 0; font-family: ui-sans-serif, system-ui, sans-serif; }
+
+.scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: #26304a; border-radius: 3px; }
+
+.btn {
+  @apply px-3 py-2 rounded-lg text-sm font-medium transition-colors
+         disabled:opacity-40 disabled:cursor-not-allowed;
+}
+.btn-primary { @apply btn bg-accent text-ink hover:bg-amber-300; }
+.btn-ghost { @apply btn bg-edge/60 text-slate-200 hover:bg-edge; }
+.btn-danger { @apply btn bg-warn/80 text-ink hover:bg-warn; }
+.card { @apply bg-panel border border-edge rounded-xl p-4; }
+.input {
+  @apply w-full bg-ink border border-edge rounded-lg px-3 py-2 text-sm
+         placeholder:text-slate-500 focus:outline-none focus:border-accent2;
+}
+.label { @apply block text-xs text-slate-400 mb-1; }
+.chip { @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
+              bg-edge/70 text-slate-200; }
+.navlink { @apply flex items-center gap-2 px-3 py-2 rounded-lg text-sm
+                 text-slate-300 hover:bg-edge/60; }
+.navlink.active { @apply bg-edge text-accent font-semibold; }
+th { @apply text-left text-xs uppercase tracking-wide text-slate-500 pb-2; }
+td { @apply py-2 text-sm border-t border-edge/60; }

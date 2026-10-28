@@ -1,0 +1,14 @@
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.venv/
+data/
+*.db
+.env
+.DS_Store
+android/app/build/
+android/build/
+android/.gradle/
+*.apk
+*.aab
