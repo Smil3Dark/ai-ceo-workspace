@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AI CEO Workspace</string>
+    <string name="title_activity_main">AI CEO Workspace</string>
+    <string name="package_name">com.aiceo.workspace</string>
+    <string name="custom_url_scheme">com.aiceo.workspace</string>
+</resources>

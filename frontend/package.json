@@ -9,6 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/cli": "^6.2.0",
+    "@capacitor/core": "^6.2.0",
     "@react-three/drei": "^9.114.0",
     "@react-three/fiber": "^8.17.10",
     "react": "^18.3.1",
