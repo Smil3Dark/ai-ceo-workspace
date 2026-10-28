@@ -4,11 +4,11 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: '#0f1420',
-        panel: '#171e2e',
-        edge: '#26304a',
-        accent: '#f7b84f',
-        accent2: '#4f8ff7',
+        ink: '#0a0a0a',
+        panel: '#141417',
+        edge: '#2a2a33',
+        accent: '#ff2d95',
+        accent2: '#007ba7',
         ok: '#34c98e',
         warn: '#f76d6d',
       },

@@ -6,13 +6,13 @@
 body { margin: 0; font-family: ui-sans-serif, system-ui, sans-serif; }
 
 .scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
-.scroll-thin::-webkit-scrollbar-thumb { background: #26304a; border-radius: 3px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: #2a2a33; border-radius: 3px; }
 
 .btn {
   @apply px-3 py-2 rounded-lg text-sm font-medium transition-colors
          disabled:opacity-40 disabled:cursor-not-allowed;
 }
-.btn-primary { @apply btn bg-accent text-ink hover:bg-amber-300; }
+.btn-primary { @apply btn bg-accent text-ink hover:brightness-125; }
 .btn-ghost { @apply btn bg-edge/60 text-slate-200 hover:bg-edge; }
 .btn-danger { @apply btn bg-warn/80 text-ink hover:bg-warn; }
 .card { @apply bg-panel border border-edge rounded-xl p-4; }
