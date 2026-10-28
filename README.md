@@ -39,6 +39,26 @@ npm run build        # sirve http://localhost:8000
 
 Para IA local instala [Ollama](https://ollama.com), `ollama serve` y `ollama pull qwen2.5:0.5b` (u otro modelo). En la app, ve a **Modelos y conexiones** y añade el proveedor "Ollama (local)" con `http://localhost:11434`.
 
+## Versión para navegador
+
+La app completa ya es web: el backend sirve el frontend en `http://localhost:8000` con todas las funciones (chat del CEO, creación de agentes, oficina 3D LEGO, memoria, tareas, confirmaciones, simulación, costes, ajustes). La APK es solo un envoltorio de esta misma web.
+
+**Opción rápida** (script local):
+
+```bash
+./scripts/serve-web.sh   # prepara venv + build si falta y sirve http://localhost:8000
+```
+
+**Opción Docker** (un solo contenedor, datos persistentes en volumen):
+
+```bash
+docker build -t ai-ceo-workspace .
+docker run -p 8000:8000 -v aceo-data:/data ai-ceo-workspace
+# → http://localhost:8000
+```
+
+Para Ollama dentro del contenedor: `--add-host=host.docker.internal:host-gateway` y apunta el proveedor a `http://host.docker.internal:11434`. También funciona en un servidor: expón el puerto 8000 detrás de tu proxy/HTTPS.
+
 ## APK Android
 
 `release/ai-ceo-workspace.apk` es la APK de depuración lista para instalar. La app móvil es una interfaz: **necesita el backend en ejecución** (en tu PC u otro equipo de la misma red). Tras instalarla abre Ajustes → "URL del backend" y apunta a `http://<IP-de-tu-PC>:8000`.
