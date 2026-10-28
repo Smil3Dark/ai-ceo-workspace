@@ -25,7 +25,7 @@ export interface Task {
   id: number; title: string; description: string; status: string;
   priority: number; agent_id?: number | null; agent_name?: string;
   project_id?: number | null; depends_on: number[]; result: any;
-  error: string; attempts: number; cost_usd: number;
+  error: string; attempts: number; max_attempts: number; cost_usd: number;
   created_by: string; created_at: string;
 }
 export interface Approval {

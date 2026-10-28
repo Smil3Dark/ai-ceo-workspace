@@ -1,20 +1,36 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Text, RoundedBox, Html } from '@react-three/drei'
+import { OrbitControls, Text, Html } from '@react-three/drei'
 import { api, connectBus } from '../api'
 import type { AgentVisual, OfficeData } from '../types'
 import * as THREE from 'three'
 
+/* Backend visual states (Spanish, from office_service.STATUS_MAP) */
 const STATE_COLOR: Record<string, string> = {
-  idle: '#4f8ff7', working: '#f7b84f', waiting_permission: '#e11d48',
-  blocked: '#a855f7', paused: '#64748b', offline: '#334155',
+  sin_actividad: '#4f8ff7', esperando: '#eab308', trabajando: '#f7b84f',
+  en_verificacion: '#22d3ee', esperando_confirmacion: '#e11d48',
+  bloqueado: '#a855f7', error: '#ef4444', pausado: '#64748b',
+  sin_configurar: '#334155',
 }
 const STATE_LABEL: Record<string, string> = {
-  idle: 'en espera', working: 'trabajando', waiting_permission: 'esperando permiso',
-  blocked: 'bloqueado', paused: 'en pausa', offline: 'desconectado',
+  sin_actividad: 'en espera', esperando: 'programado', trabajando: 'trabajando',
+  en_verificacion: 'verificando', esperando_confirmacion: 'esperando tu confirmación',
+  bloqueado: 'bloqueado', error: 'error', pausado: 'en pausa',
+  sin_configurar: 'sin configurar',
 }
 
-function Room({ scenario }: { scenario: string }) {
+/* Map backend zones (office/auto-layout) to world coords of the room */
+const ZONE_ORIGIN: Record<string, [number, number]> = {
+  ceo_desk: [8, -5.5], dev_area: [1, -1.5], library: [-5, -4.5],
+  comms_area: [8.5, -1.5], meeting_room: [-8.5, -5],
+  leisure_zone: [-8.5, 5.5], open_space: [0, 1.5],
+}
+function slotPos(zone: string, slot: number): [number, number, number] {
+  const [zx, zz] = ZONE_ORIGIN[zone] || ZONE_ORIGIN.open_space
+  return [zx + (slot % 3) * 1.9 - 1.9, 0, zz + Math.floor(slot / 3) * 1.9]
+}
+
+function Room({ scenario, layout }: { scenario: string; layout: any }) {
   if (scenario === 'lab') {
     return (
       <group>
@@ -22,12 +38,12 @@ function Room({ scenario }: { scenario: string }) {
           <planeGeometry args={[30, 30]} /><meshStandardMaterial color="#101726" />
         </mesh>
         <gridHelper args={[30, 30, '#26304a', '#1b2540']} />
+        <pointLight position={[0, 5, 0]} intensity={0.7} color="#7fd4ff" />
       </group>
     )
   }
   return (
     <group>
-      {/* floor + walls of an office */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]}>
         <planeGeometry args={[26, 18]} /><meshStandardMaterial color="#2b241d" />
       </mesh>
@@ -37,23 +53,35 @@ function Room({ scenario }: { scenario: string }) {
       <mesh position={[-13, 2, 0]} rotation={[0, Math.PI / 2, 0]}>
         <boxGeometry args={[18, 4.2, 0.15]} /><meshStandardMaterial color="#1d2740" />
       </mesh>
-      {/* windows */}
       {[[-9, -8.9], [-3, -8.9], [3, -8.9], [9, -8.9]].map(([x, z], i) => (
         <mesh key={i} position={[x, 2.4, z]}>
           <boxGeometry args={[4.4, 2, 0.1]} />
           <meshStandardMaterial color="#7fb7ff" emissive="#3a6ea8" emissiveIntensity={0.55} />
         </mesh>
       ))}
-      {/* sofas leisure zone */}
-      {[[-9, 6], [-7, 6.6]].map(([x, z], i) => (
-        <mesh key={`s${i}`} position={[x, 0.35, z]}>
-          <boxGeometry args={[1.8, 0.7, 0.9]} /><meshStandardMaterial color="#7c4d2a" />
-        </mesh>
-      ))}
-      <mesh position={[-8, 0.3, 5.4]}><boxGeometry args={[1.4, 0.6, 0.7]} />
-        <meshStandardMaterial color="#3d5a3a" /></mesh>
-      {/* plants */}
-      {[[-12, -7], [12, 7]].map(([x, z], i) => (
+      {/* meeting room zone */}
+      {layout?.meeting_room && (
+        <group position={[-8.5, 0, -5]}>
+          <mesh position={[0, 0.4, 0]}><boxGeometry args={[2.6, 0.12, 1.4]} />
+            <meshStandardMaterial color="#4a3b28" /></mesh>
+          {[[-1.4, -0.8], [-1.4, 0.8], [1.4, -0.8], [1.4, 0.8]].map(([x, z], i) => (
+            <mesh key={i} position={[x, 0.25, z]}><boxGeometry args={[0.5, 0.5, 0.5]} />
+              <meshStandardMaterial color="#33415e" /></mesh>
+          ))}
+        </group>
+      )}
+      {/* leisure zone: sofas */}
+      {layout?.leisure_zone && (
+        <group position={[-8.5, 0, 5.5]}>
+          {[[0, 0], [1.8, 0.6]].map(([x, z], i) => (
+            <mesh key={i} position={[x, 0.35, z]}><boxGeometry args={[1.8, 0.7, 0.9]} />
+              <meshStandardMaterial color="#7c4d2a" /></mesh>
+          ))}
+          <mesh position={[0.9, 0.3, -1.2]}><boxGeometry args={[1.4, 0.6, 0.7]} />
+            <meshStandardMaterial color="#3d5a3a" /></mesh>
+        </group>
+      )}
+      {[[-12, -7], [12, 7]].slice(0, layout?.plants ? 2 : 0).map(([x, z], i) => (
         <group key={`p${i}`} position={[x, 0, z]}>
           <mesh position={[0, 0.3, 0]}><cylinderGeometry args={[0.3, 0.4, 0.6]} />
             <meshStandardMaterial color="#6b4a2f" /></mesh>
@@ -82,70 +110,65 @@ function Desk({ pos }: { pos: [number, number, number] }) {
   )
 }
 
-function Avatar({ ag, pos, cycle }: { ag: AgentVisual; pos: [number, number, number]; cycle: boolean }) {
+function Avatar({ ag, pos, wandering }: {
+  ag: AgentVisual; pos: [number, number, number]; wandering: boolean
+}) {
   const ref = useRef<THREE.Group>(null)
-  const leisure = ag.status === 'idle' && Math.random() < 0.25
+  const leisure = ag.state === 'sin_actividad' && ag.agent_id % 3 === 0
   const target = useMemo<[number, number, number]>(() =>
-    leisure ? [-8 + Math.random() * 2, 0, 5.4 + Math.random() * 1.5] : [pos[0], 0, pos[2] - 0.55],
-    [pos, leisure])
+    wandering && leisure ? [-8 + (ag.agent_id % 2), 0, 4.5]
+      : [pos[0], 0, pos[2] - 0.55], [pos, leisure, wandering, ag.agent_id])
   useFrame((_, dt) => {
-    if (!ref.current || !cycle) return
+    if (!ref.current) return
     const d = ref.current.position
     d.x += (target[0] - d.x) * Math.min(1, dt * 1.2)
     d.z += (target[2] - d.z) * Math.min(1, dt * 1.2)
   })
-  const color = STATE_COLOR[ag.status] || '#4f8ff7'
+  const color = STATE_COLOR[ag.state] || '#4f8ff7'
+  const isCeo = ag.role === 'ceo'
   return (
     <group>
       <Desk pos={pos} />
       <group ref={ref} position={[pos[0], 0, pos[2] - 0.55]}>
-        {/* body */}
         <mesh position={[0, 0.55, 0]}>
           <capsuleGeometry args={[0.22, 0.45, 4, 10]} />
-          <meshStandardMaterial color={ag.avatar_color || '#4f8ff7'} />
+          <meshStandardMaterial color={ag.avatar?.color || '#4f8ff7'} />
         </mesh>
-        {/* head */}
         <mesh position={[0, 1.05, 0]}>
           <sphereGeometry args={[0.2, 16, 16]} />
           <meshStandardMaterial color="#f2d5b8" />
         </mesh>
-        {/* hat accents CEO */}
-        {ag.is_ceo && (
+        {isCeo && (
           <mesh position={[0, 1.28, 0]}><coneGeometry args={[0.18, 0.28, 8]} />
             <meshStandardMaterial color="#f7b84f" /></mesh>
         )}
-        {/* name + status */}
         <Text position={[0, 1.65, 0]} fontSize={0.22} color="#e9edf5" anchorX="center">
-          {ag.is_ceo ? `👑 ${ag.name}` : ag.name}
+          {isCeo ? `👑 ${ag.name}` : ag.name}
         </Text>
         <Text position={[0, 1.4, 0]} fontSize={0.15} color={color} anchorX="center">
-          {STATE_LABEL[ag.status] || ag.status}
+          {STATE_LABEL[ag.state] || ag.state}
         </Text>
-        <Html position={[0, 1.9, 0]} center distanceFactor={8}>
-          <div className="w-24 h-1.5 bg-black/60 rounded overflow-hidden">
-            <div className="h-full" style={{ width: `${Math.min(100, ag.usage)}%`, background: color }} />
-          </div>
-        </Html>
       </group>
     </group>
   )
 }
 
-function DayNight({ cycle, hour }: { cycle: boolean; hour: number }) {
-  const light = useMemo(() => {
-    if (!cycle) return { intensity: 0.9, color: '#ffffff', bg: '#0f1420' }
+function DayNight({ on, hour, light }: { on: boolean; hour: number; light: any }) {
+  const cfg = useMemo(() => {
+    if (!on) return { intensity: light?.intensity ?? 0.9, color: '#ffffff', bg: '#0f1420' }
     const t = Math.sin((hour - 6) / 24 * Math.PI * 2) * 0.5 + 0.5
     return {
       intensity: 0.15 + t * 0.95,
       color: hour < 7 || hour > 18 ? '#8fa8ff' : '#fff4dd',
       bg: hour < 6 || hour > 19 ? '#05070d' : hour < 9 || hour > 17 ? '#2a3450' : '#0f1420',
     }
-  }, [cycle, hour])
+  }, [on, hour, light])
   return (
     <>
-      <color attach="background" args={[light.bg]} />
-      <ambientLight intensity={light.intensity * 0.5} color={light.color} />
-      <directionalLight position={[6, 8, 4]} intensity={light.intensity} color={light.color} />
+      <color attach="background" args={[cfg.bg]} />
+      <ambientLight intensity={cfg.intensity * (light?.ambient ?? 0.5) * 2} color={cfg.color} />
+      <directionalLight position={[6, 8, 4]} intensity={cfg.intensity} color={cfg.color} />
+      {light?.interior_lights && <pointLight position={[0, 3.5, 0]} intensity={0.4} color="#ffd9a0" />}
     </>
   )
 }
@@ -159,36 +182,35 @@ export default function OfficePage() {
   const reload = () => api.get<OfficeData>('/api/office').then(setData)
   useEffect(() => { reload() }, [])
   useEffect(() => connectBus((t) => { if (['agent', 'task', 'office'].includes(t)) reload() }), [])
+  const cycleOn = data?.config.cycle?.mode === 'auto'
   useEffect(() => {
-    if (!data?.cycle) return
+    if (!cycleOn) return
     const iv = setInterval(() => setHour((h) => (h + 0.5) % 24), 4000)
     return () => clearInterval(iv)
-  }, [data?.cycle])
+  }, [cycleOn])
 
-  const set = async (k: string, v: any) => {
-    setData(await api.put('/api/office', { [k]: v }))
+  const set = async (patch: Record<string, any>) => {
+    await api.put('/api/office', patch); await reload()
   }
 
   if (!data) return <div className="p-6 text-slate-500">Cargando oficina…</div>
-  const positions = data.placements
+  const cfg = data.config
 
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center gap-2 px-4 py-2 border-b border-edge flex-wrap">
         <h1 className="font-bold mr-2">Oficina 3D</h1>
-        <select className="input !w-40" value={data.scenario} onChange={(e) => set('scenario', e.target.value)}>
-          <option value="office">Oficina moderna</option>
+        <select className="input !w-44" value={cfg.scenario}
+          onChange={(e) => set({ scenario: e.target.value })}>
+          <option value="corporate">Oficina corporativa</option>
           <option value="lab">Laboratorio</option>
         </select>
-        <select className="input !w-36" value={data.layout} onChange={(e) => set('layout', e.target.value)}>
-          <option value="grid">Cuadrícula</option>
-          <option value="open">Espacio abierto</option>
-        </select>
         <label className="text-xs flex items-center gap-1">
-          <input type="checkbox" checked={data.cycle} onChange={(e) => set('cycle', e.target.checked)} />
+          <input type="checkbox" checked={cycleOn}
+            onChange={(e) => set({ cycle: { ...cfg.cycle, mode: e.target.checked ? 'auto' : 'off' } })} />
           ciclo día/noche
         </label>
-        {data.cycle && <span className="chip">{String(Math.floor(hour)).padStart(2, '0')}:00</span>}
+        {cycleOn && <span className="chip">{String(Math.floor(hour)).padStart(2, '0')}:00</span>}
         <label className="text-xs flex items-center gap-1 ml-auto">
           <input type="checkbox" checked={admin} onChange={(e) => setAdmin(e.target.checked)} />
           modo administrador
@@ -196,15 +218,18 @@ export default function OfficePage() {
       </div>
       <div className="flex-1 relative">
         <Canvas camera={{ position: [9, 8, 10], fov: 45 }}>
-          <DayNight cycle={data.cycle} hour={hour} />
+          <DayNight on={cycleOn} hour={hour} light={cfg.lighting} />
           <Suspense fallback={null}>
-            <Room scenario={data.scenario} />
-            {data.agents.map((a) => positions[a.id] && (
-              <group key={a.id}
-                onClick={() => setSel(a)}>
-                <Avatar ag={a} pos={positions[a.id] as [number, number, number]} cycle={data.cycle} />
-              </group>
-            ))}
+            <Room scenario={cfg.scenario} layout={cfg.layout} />
+            {data.agents.map((a, i) => {
+              const p = cfg.placements?.[String(a.agent_id)]
+              const pos = p ? slotPos(p.zone, p.slot) : slotPos('open_space', i)
+              return (
+                <group key={a.agent_id} onClick={() => setSel(a)}>
+                  <Avatar ag={a} pos={pos} wandering={cycleOn && !!cfg.layout?.leisure_zone} />
+                </group>
+              )
+            })}
           </Suspense>
           <OrbitControls maxPolarAngle={Math.PI / 2.15} minDistance={3} maxDistance={22}
             enablePan enableRotate enableZoom />
@@ -212,17 +237,31 @@ export default function OfficePage() {
         {admin && (
           <div className="absolute right-3 top-3 card w-72 space-y-2 max-h-[80%] overflow-y-auto scroll-thin">
             <h3 className="font-semibold">Administrador de oficina</h3>
-            <label className="label">Iluminación</label>
-            <select className="input" value={data.lighting} onChange={(e) => set('lighting', e.target.value)}>
-              <option value="auto">Automática</option><option value="day">Día</option>
-              <option value="night">Noche</option><option value="warm">Cálida</option>
-            </select>
-            <label className="label">Reorganizar</label>
-            <button className="btn-ghost text-xs w-full" onClick={async () =>
-              setData(await api.post('/api/office/auto-layout'))}>Disposición automática por zonas</button>
+            <label className="label">Intensidad de luz</label>
+            <input type="range" className="w-full" min={0.2} max={1.6} step={0.1}
+              value={cfg.lighting?.intensity ?? 1}
+              onChange={(e) => set({ lighting: { ...cfg.lighting, intensity: +e.target.value } })} />
+            <label className="text-xs flex items-center gap-2">
+              <input type="checkbox" checked={!!cfg.lighting?.interior_lights}
+                onChange={(e) => set({ lighting: { ...cfg.lighting, interior_lights: e.target.checked } })} />
+              luces interiores
+            </label>
+            <label className="text-xs flex items-center gap-2">
+              <input type="checkbox" checked={!!cfg.layout?.leisure_zone}
+                onChange={(e) => set({ layout: { ...cfg.layout, leisure_zone: e.target.checked } })} />
+              zona de ocio
+            </label>
+            <label className="text-xs flex items-center gap-2">
+              <input type="checkbox" checked={!!cfg.layout?.meeting_room}
+                onChange={(e) => set({ layout: { ...cfg.layout, meeting_room: e.target.checked } })} />
+              sala de reunión
+            </label>
+            <button className="btn-ghost text-xs w-full" onClick={async () => {
+              await api.post('/api/office/auto-layout'); await reload()
+            }}>Disposición automática por zonas</button>
             <div className="text-xs text-slate-500">
-              Zonas: puestos de trabajo (centro), reunión (izquierda),
-              ocio (abajo-izquierda), recepción (entrada).
+              Zonas: CEO, desarrollo, biblioteca, comunicaciones, reunión, ocio,
+              espacio abierto.
             </div>
           </div>
         )}
@@ -233,11 +272,12 @@ export default function OfficePage() {
               <button className="btn-ghost" onClick={() => setSel(null)}>✕</button>
             </div>
             <div className="text-xs text-slate-400 mt-1 space-y-1">
-              <div>Estado: <span style={{ color: STATE_COLOR[sel.status] }}>{STATE_LABEL[sel.status]}</span></div>
-              <div>Rol: {sel.role} · Modelo: {sel.model}</div>
-              {sel.task && <div>Tarea: {sel.task.title}</div>}
-              <div>Uso de contexto: {sel.usage}%</div>
-              {sel.waiting_auth && <div className="text-warn">⏸ Esperando tu autorización en Confirmaciones</div>}
+              <div>Estado: <span style={{ color: STATE_COLOR[sel.state] }}>{STATE_LABEL[sel.state] || sel.state}</span></div>
+              <div>Rol: {sel.role} · estado interno: {sel.db_status}</div>
+              {sel.task && <div>Tarea: {sel.task}</div>}
+              {sel.state === 'esperando_confirmacion' && (
+                <div className="text-warn">⏸ Esperando tu autorización en Confirmaciones</div>
+              )}
             </div>
           </div>
         )}
